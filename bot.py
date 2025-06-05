@@ -131,4 +131,5 @@ async def main() -> None:
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
+    print("Запускаем main()...")  # Лог перед запуском
     asyncio.run(main())

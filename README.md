@@ -10,8 +10,14 @@
 ## Создание `.env`
 1. В корне проекта создайте файл `.env` со следующим содержимым:
    ```bash
+   ACTIVE_TOKEN=TOKEN_TURKEY
    OPENAI_API_KEY=ваш_ключ
-   TELEGRAM_BOT_TOKEN=токен_бота
+   TOKEN_TURKEY=
+   TOKEN_INDONESIA=
+   TOKEN_ARABIC=
+   TOKEN_VIETNAM=
+   TOKEN_BRAZIL=
+   BOT_USERNAME=your_bot
    FREE_MESSAGES=10
    ```
 
@@ -24,8 +30,9 @@
 
 ## Деплой на Railway
 1. Зарегистрируйтесь на [Railway](https://railway.app/) и создайте новый проект.
-2. Подключите репозиторий и укажите переменные окружения (`OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `FREE_MESSAGES`).
-3. Нажмите **Deploy** для запуска приложения.
+2. Подключите репозиторий и задайте переменные окружения из `.env`.
+3. Railway автоматически запустит бота по команде из `Procfile`.
+4. Нажмите **Deploy** для запуска приложения.
 
 ## Функционал бота
 - 10 бесплатных сообщений для каждого пользователя.

@@ -126,6 +126,13 @@ async def start_bot(token: str, lang: str) -> None:
             await message.answer("Ошибка подключения. Попробуйте позже.")
 
 async def main() -> None:
+    print("Тест переменных окружения:")
+    print(f"TOKEN_TURKEY: {os.getenv('TOKEN_TURKEY')}")
+    print(f"TOKEN_INDONESIA: {os.getenv('TOKEN_INDONESIA')}")
+    print(f"TOKEN_ARABIC: {os.getenv('TOKEN_ARABIC')}")
+    print(f"TOKEN_VIETNAM: {os.getenv('TOKEN_VIETNAM')}")
+    print(f"TOKEN_BRAZIL: {os.getenv('TOKEN_BRAZIL')}")
+    print(f"ACTIVE_TOKEN: {os.getenv('ACTIVE_TOKEN')}")
     print("main() успешно вызвана")
     logging.basicConfig(level=logging.INFO)
     tasks = [start_bot(cfg["token"], cfg["lang"]) for cfg in BOTS if cfg["token"]]

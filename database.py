@@ -1,6 +1,8 @@
 import os
 import sqlite3
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
+
+import aiosqlite
 
 from dotenv import load_dotenv
 
@@ -22,6 +24,17 @@ def init_db() -> None:
             language_code TEXT,
             message_count INTEGER DEFAULT 0,
             is_paid INTEGER DEFAULT 0
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            message TEXT,
+            is_user INTEGER,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
@@ -72,12 +85,51 @@ def set_paid(telegram_id: int, paid: bool = True) -> None:
     conn.commit()
 
 
+async def add_message(user_id: int, message: str, is_user: bool) -> None:
+    """Store a single message for given user."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO messages (user_id, message, is_user) VALUES (?, ?, ?)",
+            (user_id, message, 1 if is_user else 0),
+        )
+        await db.commit()
+
+
+async def get_last_messages(user_id: int, limit: int = 10) -> List[Tuple[str, bool]]:
+    """Return last messages for user ordered by timestamp ascending."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT message, is_user FROM messages WHERE user_id = ? "
+            "ORDER BY timestamp DESC LIMIT ?",
+            (user_id, limit),
+        )
+        rows = await cur.fetchall()
+    return [ (row["message"], bool(row["is_user"])) for row in reversed(rows) ]
+
+
 async def get_message_count(user_id: int) -> int:
-    user = get_user(user_id)
-    return user.get('message_count', 0) if user else 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT message_count FROM users WHERE telegram_id = ?",
+            (user_id,),
+        )
+        row = await cur.fetchone()
+    return row[0] if row else 0
 
 
 
 async def increment_message_count(user_id: int) -> None:
-    increment_messages(user_id)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE users SET message_count = COALESCE(message_count, 0) + 1 "
+            "WHERE telegram_id = ?",
+            (user_id,),
+        )
+        if cur.rowcount == 0:
+            await db.execute(
+                "INSERT INTO users (telegram_id, message_count) VALUES (?, 1)",
+                (user_id,),
+            )
+        await db.commit()
 

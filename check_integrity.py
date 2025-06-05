@@ -145,11 +145,12 @@ def check_env_vars() -> None:
 
 def check_requirements() -> None:
     required_modules = []
+    import re
     with open("requirements.txt", "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#"):
-                required_modules.append(line.split("==")[0])
+                required_modules.append(re.split(r"[<>=]", line)[0])
 
     imported = set()
     for path in PY_FILES:

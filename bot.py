@@ -125,14 +125,10 @@ async def start_bot(token: str, lang: str) -> None:
             logging.exception("OpenAI error")
             await message.answer("Ошибка подключения. Попробуйте позже.")
 
-    await dp.start_polling(bot)
-
-
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
     tasks = [start_bot(cfg["token"], cfg["lang"]) for cfg in BOTS if cfg["token"]]
     await asyncio.gather(*tasks)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -126,6 +126,7 @@ async def start_bot(token: str, lang: str) -> None:
             await message.answer("Ошибка подключения. Попробуйте позже.")
 
 async def main() -> None:
+    print("main() успешно вызвана")
     logging.basicConfig(level=logging.INFO)
     tasks = [start_bot(cfg["token"], cfg["lang"]) for cfg in BOTS if cfg["token"]]
     await asyncio.gather(*tasks)

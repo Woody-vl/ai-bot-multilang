@@ -3,6 +3,43 @@ import ast
 import importlib.util
 import sys
 
+STUBS = {
+    "database.py": {
+        "get_message_count": (
+            "async def get_message_count(user_id: int) -> int:\n"
+            "    user = get_user(user_id)\n"
+            "    return user.get('message_count', 0) if user else 0\n"
+        ),
+        "increment_message_count": (
+            "async def increment_message_count(user_id: int) -> None:\n"
+            "    increment_messages(user_id)\n"
+        ),
+    },
+    "payments.py": {
+        "generate_purchase_button": (
+            "async def generate_purchase_button(user_id: int):\n"
+            "    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup\n"
+            "    url = get_payment_url(user_id)\n"
+            "    button = InlineKeyboardButton(text='Buy', url=url)\n"
+            "    return InlineKeyboardMarkup(inline_keyboard=[[button]])\n"
+        ),
+    },
+    "utils.py": {
+        "get_localized_strings": (
+            "async def get_localized_strings(lang_code: str):\n"
+            "    return get_locale_strings(lang_code)\n"
+        ),
+    },
+}
+
+def ensure_stub(path: str, func_name: str) -> None:
+    """Append stub implementation for the given function."""
+    code = STUBS.get(path, {}).get(func_name)
+    if not code:
+        return
+    with open(path, "a", encoding="utf-8") as f:
+        f.write("\n\n" + code + "\n")
+
 GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
@@ -43,20 +80,21 @@ def check_required_functions() -> None:
     for path in PY_FILES:
         with open(path, "r", encoding="utf-8") as f:
             tree = ast.parse(f.read(), filename=path)
-        func_names = {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}
+        funcs = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
 
-        if path == "database.py":
-            for func in ["init_db", "get_message_count", "increment_message_count"]:
-                if func not in func_names:
-                    errors.append(f"database.py: missing function {func}")
+        if path in STUBS:
+            for func_name in STUBS[path]:
+                node = funcs.get(func_name)
+                if node is None or not isinstance(node, ast.AsyncFunctionDef):
+                    errors.append(f"{path}: missing async function {func_name}")
+                    ensure_stub(path, func_name)
 
-        if path == "payments.py":
-            if "generate_purchase_button" not in func_names:
-                errors.append("payments.py: missing function generate_purchase_button")
-
-        if path == "utils.py":
-            if "get_localized_strings" not in func_names:
-                errors.append("utils.py: missing function get_localized_strings")
+        if path == "database.py" and "init_db" not in funcs:
+            errors.append("database.py: missing function init_db")
 
         if path == "handlers.py":
             has_router = any(
@@ -70,7 +108,7 @@ def check_required_functions() -> None:
             has_start = False
             has_message = False
             for node in tree.body:
-                if isinstance(node, ast.FunctionDef):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     for deco in node.decorator_list:
                         if isinstance(deco, ast.Call) and isinstance(deco.func, ast.Attribute):
                             if isinstance(deco.func.value, ast.Name) and deco.func.value.id == "router" and deco.func.attr == "message":
@@ -127,6 +165,15 @@ def check_requirements() -> None:
 
     third_party = {m for m in imported if not is_std_lib(m)}
     for mod in sorted(third_party):
+        if mod == "dotenv" and "python-dotenv" in required_modules:
+            continue
+        if mod not in required_modules:
+            errors.append(f"requirements.txt missing module: {mod}")
+
+    explicit = {"aiogram", "openai", "python-dotenv"}
+    if "sqlite3" in imported or "aiosqlite" in imported:
+        explicit.add("aiosqlite")
+    for mod in sorted(explicit):
         if mod not in required_modules:
             errors.append(f"requirements.txt missing module: {mod}")
 

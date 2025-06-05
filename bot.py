@@ -15,7 +15,14 @@ async def main() -> None:
 
     init_db()
 
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    active_token_name = os.getenv("ACTIVE_TOKEN")
+    if not active_token_name:
+        raise RuntimeError("Environment variable ACTIVE_TOKEN is not set")
+    bot_token = os.getenv(active_token_name)
+    if not bot_token:
+        raise RuntimeError(
+            f"Environment variable '{active_token_name}' with bot token is not set"
+        )
     bot = Bot(bot_token)
     dp = Dispatcher()
     dp.include_router(router)

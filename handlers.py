@@ -11,7 +11,15 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 from openai import AsyncOpenAI
 
-from database import get_user, increment_messages, init_db, set_paid
+from database import (
+    get_user,
+    init_db,
+    set_paid,
+    add_message,
+    get_last_messages,
+    increment_message_count,
+    get_message_count,
+)
 from payments import get_payment_url, check_payment
 from utils import get_locale_strings
 
@@ -47,7 +55,11 @@ async def handle_message(message: Message) -> None:
     lang = (user.get("language_code") if user else message.from_user.language_code) or "en"
     texts = get_locale_strings(lang)
 
-    if user and not user.get("is_paid") and user.get("message_count", 0) >= FREE_MESSAGES:
+    if user:
+        current_count = user.get("message_count", 0)
+    else:
+        current_count = await get_message_count(message.from_user.id)
+    if user and not user.get("is_paid") and current_count >= FREE_MESSAGES:
         url = get_payment_url(message.from_user.id)
         kb = InlineKeyboardMarkup(
             inline_keyboard=[[InlineKeyboardButton(text=texts["buy_button"], url=url)]]
@@ -55,14 +67,24 @@ async def handle_message(message: Message) -> None:
         await message.answer(texts["limit_exceeded"], reply_markup=kb)
         return
 
-    increment_messages(message.from_user.id)
+    await increment_message_count(message.from_user.id)
+
+    history = await get_last_messages(message.from_user.id, 10)
+    chat_messages = [
+        {"role": "user" if is_user else "assistant", "content": text}
+        for text, is_user in history
+    ]
+    chat_messages.append({"role": "user", "content": message.text})
+
+    await add_message(message.from_user.id, message.text, True)
 
     try:
         response = await openai.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": message.text}],
+            messages=chat_messages,
         )
         answer = response.choices[0].message.content
+        await add_message(message.from_user.id, answer, False)
         await message.answer(answer)
     except Exception as e:
         logging.exception("OpenAI error")

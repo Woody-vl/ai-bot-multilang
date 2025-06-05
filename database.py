@@ -70,3 +70,14 @@ def set_paid(telegram_id: int, paid: bool = True) -> None:
         (1 if paid else 0, telegram_id),
     )
     conn.commit()
+
+
+async def get_message_count(user_id: int) -> int:
+    user = get_user(user_id)
+    return user.get('message_count', 0) if user else 0
+
+
+
+async def increment_message_count(user_id: int) -> None:
+    increment_messages(user_id)
+

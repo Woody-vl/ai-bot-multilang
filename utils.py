@@ -16,3 +16,8 @@ def get_locale_strings(lang_code: str) -> Dict[str, str]:
         },
     }
     return data.get(lang_code, data["en"])
+
+
+async def get_localized_strings(lang_code: str):
+    return get_locale_strings(lang_code)
+

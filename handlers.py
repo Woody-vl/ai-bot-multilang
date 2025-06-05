@@ -9,13 +9,13 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 from aiogram.fsm.context import FSMContext
-import openai
+from openai import AsyncOpenAI
 
 from database import get_user, increment_messages, init_db, set_paid
 from payments import get_payment_url, check_payment
 from utils import get_locale_strings
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 FREE_MESSAGES = int(os.getenv("FREE_MESSAGES", "10"))
 
 router = Router()
@@ -58,7 +58,7 @@ async def handle_message(message: Message) -> None:
     increment_messages(message.from_user.id)
 
     try:
-        response = await openai.ChatCompletion.acreate(
+        response = await openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": message.text}],
         )

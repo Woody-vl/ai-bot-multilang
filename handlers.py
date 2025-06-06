@@ -2,7 +2,7 @@ import os
 import logging
 
 from aiogram import Router
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
@@ -21,12 +21,29 @@ from database import (
     get_message_count,
 )
 from payments import get_payment_url, check_payment
+from aiogram import Bot, types
 from utils import get_locale_strings
 
 openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 FREE_MESSAGES = int(os.getenv("FREE_MESSAGES", "10"))
 
 router = Router()
+
+
+@router.message(Command('buy'))
+async def buy_command(message: Message):
+    prices = [types.LabeledPrice(label='Премиум подписка', amount=500)]
+    bot = Bot.get_current()
+    await bot.send_invoice(
+        chat_id=message.chat.id,
+        title='Премиум подписка',
+        description='Доступ к премиум возможностям',
+        payload='premium_subscription',
+        provider_token='',
+        currency='XTR',
+        prices=prices,
+        start_parameter='buy-premium'
+    )
 
 
 @router.message(CommandStart())

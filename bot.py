@@ -105,7 +105,7 @@ async def start_bot(token: str, lang: str) -> None:
 
     bot = Bot(token=token)
     dp = Dispatcher()
-    setup_payment_handlers(dp, bot)
+    dp.include_router(setup_payment_handlers())
 
     @dp.message(CommandStart())
     async def start_handler(message: Message) -> None:

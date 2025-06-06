@@ -51,6 +51,19 @@ def init_db() -> None:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            amount INTEGER,
+            currency TEXT,
+            stars_transaction_id TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
     conn.commit()
 
 
@@ -173,4 +186,9 @@ def get_user_language(user_id: int) -> str:
     )
     row = cur.fetchone()
     return row[0] if row else "en"
+
+
+# Ensure tables are created when the module is imported
+init_db()
+
 

@@ -179,11 +179,19 @@ def check_requirements() -> None:
             errors.append(f"requirements.txt missing module: {mod}")
 
 
+def check_db_structure() -> None:
+    with open("database.py", "r", encoding="utf-8") as f:
+        content = f.read().lower()
+    if "create table if not exists payments" not in content:
+        errors.append("database.py: missing payments table")
+
+
 def main() -> None:
     check_syntax()
     check_required_functions()
     check_env_vars()
     check_requirements()
+    check_db_structure()
 
     if errors:
         print(f"{RED}❌ Обнаружены проблемы:{RESET}")

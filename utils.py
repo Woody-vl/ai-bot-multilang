@@ -1,4 +1,6 @@
-from typing import Dict
+from typing import Dict, List, Dict as DictType
+import aiosqlite
+from database import DB_PATH
 
 
 def get_locale_strings(lang_code: str) -> Dict[str, str]:
@@ -20,6 +22,18 @@ def get_locale_strings(lang_code: str) -> Dict[str, str]:
 
 async def get_localized_strings(lang_code: str):
     return get_locale_strings(lang_code)
+
+
+async def get_user_payments(user_id: int) -> List[DictType]:
+    """Return a list of payment records for the given user."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM payments WHERE user_id = ? ORDER BY timestamp DESC",
+            (user_id,),
+        )
+        rows = await cur.fetchall()
+    return [dict(row) for row in rows]
 
 
 from openai_client import chat

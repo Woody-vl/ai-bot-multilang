@@ -23,7 +23,8 @@ def init_db() -> None:
             telegram_id INTEGER UNIQUE,
             language_code TEXT,
             message_count INTEGER DEFAULT 0,
-            is_paid INTEGER DEFAULT 0
+            is_paid INTEGER DEFAULT 0,
+            is_premium INTEGER DEFAULT 0
         )
         """
     )
@@ -131,5 +132,14 @@ async def increment_message_count(user_id: int) -> None:
                 "INSERT INTO users (telegram_id, message_count) VALUES (?, 1)",
                 (user_id,),
             )
+        await db.commit()
+
+
+async def mark_user_premium(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET is_premium = 1 WHERE user_id = ?",
+            (user_id,),
+        )
         await db.commit()
 

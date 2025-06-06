@@ -1,6 +1,7 @@
 import os
 
-from database import get_user
+from aiogram import Bot, Dispatcher, types
+from database import get_user, mark_user_premium
 
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "your_bot")
@@ -22,4 +23,15 @@ async def generate_purchase_button(user_id: int):
     url = get_payment_url(user_id)
     button = InlineKeyboardButton(text='Buy', url=url)
     return InlineKeyboardMarkup(inline_keyboard=[[button]])
+
+
+def setup_payment_handlers(dp: Dispatcher, bot: Bot) -> None:
+    @dp.pre_checkout_query_handler(lambda query: True)
+    async def pre_checkout_query(pre_checkout_q: types.PreCheckoutQuery):
+        await bot.answer_pre_checkout_query(pre_checkout_q.id, ok=True)
+
+    @dp.message_handler(content_types=types.ContentType.SUCCESSFUL_PAYMENT)
+    async def successful_payment(message: types.Message):
+        await message.answer("✅ Оплата успешно завершена! Спасибо за покупку.")
+        await mark_user_premium(message.from_user.id)
 

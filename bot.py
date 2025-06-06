@@ -4,14 +4,17 @@ import os
 import sqlite3
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
     ReplyKeyboardMarkup,
     KeyboardButton,
+    LabeledPrice,
 )
+from handlers import *
+from payments import *
 from openai import AsyncOpenAI
 
 # Configuration from environment variables
@@ -102,10 +105,25 @@ async def start_bot(token: str, lang: str) -> None:
 
     bot = Bot(token=token)
     dp = Dispatcher()
+    setup_payment_handlers(dp, bot)
 
     @dp.message(CommandStart())
     async def start_handler(message: Message) -> None:
         await message.answer(WELCOME_MESSAGES.get(lang, "Привет!"), reply_markup=reply_keyboard())
+
+    @dp.message(Command('buy'))
+    async def buy_handler(message: Message) -> None:
+        prices = [LabeledPrice(label='Премиум подписка', amount=500)]
+        await bot.send_invoice(
+            chat_id=message.chat.id,
+            title='Премиум подписка',
+            description='Доступ к премиум возможностям',
+            payload='premium_subscription',
+            provider_token='',
+            currency='XTR',
+            prices=prices,
+            start_parameter='buy-premium'
+        )
 
     @dp.message()
     async def handle_message(message: Message) -> None:

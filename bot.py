@@ -34,6 +34,15 @@ WELCOME_MESSAGES = {
     "pt": "🇧🇷 Olá! Sou seu primeiro assistente de IA em português. Primeiras 10 mensagens grátis.",
 }
 
+# Texts shown when a user reaches the free message limit
+LIMIT_REACHED_MESSAGES = {
+    "tr": "Ücretsiz mesaj sınırına ulaşıldı.",
+    "id": "Batas pesan gratis telah tercapai.",
+    "ar": "تم استهلاك الحد الأقصى للرسائل المجانية.",
+    "vi": "Bạn đã sử dụng hết số tin nhắn miễn phí.",
+    "pt": "Limite de mensagens gratuitas atingido.",
+}
+
 # Database setup
 DB_PATH = "users.db"
 conn = sqlite3.connect(DB_PATH)
@@ -100,11 +109,13 @@ async def start_bot(token: str, lang: str) -> None:
 
     @dp.message()
     async def handle_message(message: Message) -> None:
+        if message.text.startswith("/start"):
+            return
         user_id = message.from_user.id
         count = get_message_count(user_id)
         if count >= FREE_MESSAGES:
             await message.answer(
-                "Лимит бесплатных сообщений исчерпан.",
+                LIMIT_REACHED_MESSAGES.get(lang, "Лимит бесплатных сообщений исчерпан."),
                 reply_markup=purchase_keyboard(),
             )
             return
@@ -115,7 +126,7 @@ async def start_bot(token: str, lang: str) -> None:
             completion = await openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": f"You are a helpful assistant that speaks {lang}."},
+                    {"role": "system", "content": f"You are a helpful assistant. Always respond in {lang}."},
                     {"role": "user", "content": message.text},
                 ],
             )

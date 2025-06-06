@@ -2,6 +2,7 @@ import os
 import sqlite3
 from typing import Optional, Dict, List, Tuple
 
+
 import aiosqlite
 
 from dotenv import load_dotenv
@@ -15,19 +16,34 @@ conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 
 
 def init_db() -> None:
-    """Create users table if it does not exist."""
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            telegram_id INTEGER UNIQUE,
-            language_code TEXT,
-            message_count INTEGER DEFAULT 0,
-            is_paid INTEGER DEFAULT 0,
-            is_premium INTEGER DEFAULT 0
-        )
-        """
+    """Create or update users table."""
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
     )
+    exists = cur.fetchone() is not None
+    if not exists:
+        conn.execute(
+            """
+            CREATE TABLE users (
+                user_id INTEGER PRIMARY KEY,
+                message_count INTEGER DEFAULT 0,
+                is_premium BOOLEAN DEFAULT FALSE
+            )
+            """
+        )
+    else:
+        cur = conn.execute("PRAGMA table_info(users)")
+        cols = {row[1] for row in cur.fetchall()}
+        if "user_id" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN user_id INTEGER")
+        if "message_count" not in cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN message_count INTEGER DEFAULT 0"
+            )
+        if "is_premium" not in cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN is_premium BOOLEAN DEFAULT FALSE"
+            )
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS messages (
@@ -65,6 +81,8 @@ def init_db() -> None:
         """
     )
     conn.commit()
+    from utils import log_info
+    log_info("Database initialized")
 
 
 def get_user(telegram_id: int) -> Optional[Dict]:

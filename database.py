@@ -39,6 +39,18 @@ def init_db() -> None:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS support_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            language_code TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
     conn.commit()
 
 
@@ -142,4 +154,23 @@ async def mark_user_premium(user_id: int):
             (user_id,),
         )
         await db.commit()
+
+
+def log_support_message(user_id: int, username: str, language_code: str, message: str) -> None:
+    """Store user support message for later reference."""
+    conn.execute(
+        "INSERT INTO support_messages (user_id, username, language_code, message) VALUES (?, ?, ?, ?)",
+        (user_id, username, language_code, message),
+    )
+    conn.commit()
+
+
+def get_user_language(user_id: int) -> str:
+    """Return last known language for the user."""
+    cur = conn.execute(
+        "SELECT language_code FROM support_messages WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row else "en"
 

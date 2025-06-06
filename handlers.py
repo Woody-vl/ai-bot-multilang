@@ -1,108 +1,118 @@
-import os
-import logging
-
-from aiogram import Router
+import re
+from aiogram import Router, Bot
 from aiogram.filters import CommandStart, Command
-from aiogram.types import (
-    Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
-from openai import AsyncOpenAI
+from aiogram.fsm.state import StatesGroup, State
 
-from database import (
-    get_user,
-    init_db,
-    set_paid,
-    add_message,
-    get_last_messages,
-    increment_message_count,
-    get_message_count,
-)
-from payments import get_payment_url, check_payment
-from aiogram import Bot, types
-from utils import get_locale_strings
+from translations import get_translation, SUPPORTED_LANGS
+from utils import translate_text
+from database import init_db, log_support_message, get_user_language
 
-openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-FREE_MESSAGES = int(os.getenv("FREE_MESSAGES", "10"))
+OWNER = "@VasiliiOz"
 
 router = Router()
 
 
-@router.message(Command('buy'))
-async def buy_command(message: Message):
-    prices = [types.LabeledPrice(label='Премиум подписка', amount=500)]
-    bot = Bot.get_current()
-    await bot.send_invoice(
-        chat_id=message.chat.id,
-        title='Премиум подписка',
-        description='Доступ к премиум возможностям',
-        payload='premium_subscription',
-        provider_token='',
-        currency='XTR',
-        prices=prices,
-        start_parameter='buy-premium'
+def menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🧾 Проблема с оплатой")],
+            [KeyboardButton(text="❓ Другое")],
+            [KeyboardButton(text="📨 Связаться с человеком")],
+        ],
+        resize_keyboard=True,
     )
+
+
+class Form(StatesGroup):
+    payment = State()
+    support = State()
 
 
 @router.message(CommandStart())
 async def start_handler(message: Message, state: FSMContext) -> None:
-    """Handle /start command and save user in DB."""
     init_db()
-    lang = message.from_user.language_code or "en"
-    user = get_user(message.from_user.id)
-    if not user:
-        # Insert new user with detected language
-        from database import conn
-        conn.execute(
-            "INSERT INTO users (telegram_id, language_code) VALUES (?, ?)",
-            (message.from_user.id, lang),
-        )
-        conn.commit()
-    texts = get_locale_strings(lang)
     await state.clear()
-    await message.answer(texts["greeting"])
+    lang = message.from_user.language_code or "en"
+    lang = lang if lang in SUPPORTED_LANGS else "en"
+    await message.answer(get_translation(lang, "start"), reply_markup=menu_keyboard())
+
+
+@router.message(Command("help"))
+async def help_handler(message: Message) -> None:
+    lang = message.from_user.language_code or "en"
+    lang = lang if lang in SUPPORTED_LANGS else "en"
+    await message.answer(get_translation(lang, "help"))
+
+
+@router.message(Command("paysupport"))
+async def paysupport_command(message: Message, state: FSMContext) -> None:
+    lang = message.from_user.language_code or "en"
+    lang = lang if lang in SUPPORTED_LANGS else "en"
+    await message.answer(get_translation(lang, "ask_payment"))
+    await state.set_state(Form.payment)
+
+
+@router.message(Command("support"))
+async def support_command(message: Message, state: FSMContext) -> None:
+    lang = message.from_user.language_code or "en"
+    lang = lang if lang in SUPPORTED_LANGS else "en"
+    await message.answer(get_translation(lang, "ask_support"))
+    await state.set_state(Form.support)
+
+
+@router.message(lambda m: m.text == "🧾 Проблема с оплатой")
+async def paysupport_button(message: Message, state: FSMContext) -> None:
+    await paysupport_command(message, state)
+
+
+@router.message(lambda m: m.text == "❓ Другое")
+async def support_button(message: Message, state: FSMContext) -> None:
+    await support_command(message, state)
+
+
+@router.message(lambda m: m.text == "📨 Связаться с человеком")
+async def contact_button(message: Message) -> None:
+    await message.answer("https://t.me/VasiliiOz")
+
+
+@router.message(Form.payment)
+async def handle_payment(message: Message, state: FSMContext, bot: Bot) -> None:
+    lang = message.from_user.language_code or "en"
+    lang = lang if lang in SUPPORTED_LANGS else "en"
+    log_support_message(message.from_user.id, message.from_user.username or "", lang, message.text)
+    text_ru = await translate_text(message.text, "ru")
+    await bot.send_message(OWNER, f"pay from {message.from_user.id}: {text_ru}")
+    await state.clear()
+    await message.answer("✅")
+
+
+@router.message(Form.support)
+async def handle_support(message: Message, state: FSMContext, bot: Bot) -> None:
+    lang = message.from_user.language_code or "en"
+    lang = lang if lang in SUPPORTED_LANGS else "en"
+    log_support_message(message.from_user.id, message.from_user.username or "", lang, message.text)
+    text_ru = await translate_text(message.text, "ru")
+    await bot.send_message(OWNER, f"support from {message.from_user.id}: {text_ru}")
+    await state.clear()
+    await message.answer("✅")
 
 
 @router.message()
-async def handle_message(message: Message) -> None:
-    """Process user messages and interact with OpenAI."""
-    user = get_user(message.from_user.id)
-    lang = (user.get("language_code") if user else message.from_user.language_code) or "en"
-    texts = get_locale_strings(lang)
-
-    if user:
-        current_count = user.get("message_count", 0)
-    else:
-        current_count = await get_message_count(message.from_user.id)
-    if user and not user.get("is_paid") and current_count >= FREE_MESSAGES:
-        url = get_payment_url(message.from_user.id)
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text=texts["buy_button"], url=url)]]
-        )
-        await message.answer(texts["limit_exceeded"], reply_markup=kb)
-        return
-
-    await increment_message_count(message.from_user.id)
-
-    history = await get_last_messages(message.from_user.id, 10)
-    chat_messages = [
-        {"role": "user" if is_user else "assistant", "content": text}
-        for text, is_user in history
-    ]
-    chat_messages.append({"role": "user", "content": message.text})
-
-    await add_message(message.from_user.id, message.text, True)
-
-    try:
-        response = await openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=chat_messages,
-        )
-        answer = response.choices[0].message.content
-        await add_message(message.from_user.id, answer, False)
-        await message.answer(answer)
-    except Exception as e:
-        logging.exception("OpenAI error")
-        await message.answer("Error while contacting OpenAI.")
+async def default_handler(message: Message, bot: Bot) -> None:
+    if message.from_user.username == OWNER.lstrip("@"):
+        match = re.match(r"reply:(\d+)\s+(.*)", message.text or "", re.DOTALL)
+        if match:
+            user_id = int(match.group(1))
+            text = match.group(2)
+            lang = get_user_language(user_id)
+            translated = await translate_text(text, lang)
+            await bot.send_message(user_id, translated)
+            return
+    log_support_message(
+        message.from_user.id,
+        message.from_user.username or "",
+        message.from_user.language_code or "en",
+        message.text or "",
+    )

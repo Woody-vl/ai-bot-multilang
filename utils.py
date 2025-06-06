@@ -1,6 +1,12 @@
 from typing import Dict, List, Dict as DictType
+import logging
 import aiosqlite
 from database import DB_PATH
+
+
+def log_info(message: str) -> None:
+    """Log informational message using project logger."""
+    logging.getLogger(__name__).info(message)
 
 
 def get_locale_strings(lang_code: str) -> Dict[str, str]:

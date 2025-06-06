@@ -186,12 +186,24 @@ def check_db_structure() -> None:
         errors.append("database.py: missing payments table")
 
 
+def check_users_table() -> None:
+    """Ensure database.py defines required users columns."""
+    with open("database.py", "r", encoding="utf-8") as f:
+        content = f.read().lower()
+
+    required = ["user_id", "message_count", "is_premium"]
+    for col in required:
+        if col not in content:
+            errors.append(f"users table missing column: {col}")
+
+
 def main() -> None:
     check_syntax()
     check_required_functions()
     check_env_vars()
     check_requirements()
     check_db_structure()
+    check_users_table()
 
     if errors:
         print(f"{RED}❌ Обнаружены проблемы:{RESET}")

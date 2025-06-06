@@ -1,6 +1,7 @@
 import os
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Router, F
+from aiogram.types import PreCheckoutQuery, Message
 from database import get_user, mark_user_premium, conn
 
 
@@ -34,13 +35,18 @@ def log_payment(user_id: int, username: str, amount: int, currency: str, transac
     conn.commit()
 
 
-def setup_payment_handlers(dp: Dispatcher, bot: Bot) -> None:
-    @dp.pre_checkout_query_handler(lambda query: True)
-    async def pre_checkout_query(pre_checkout_q: types.PreCheckoutQuery):
+def setup_payment_handlers() -> Router:
+    """Configure payment handlers and return a router."""
+    router = Router()
+
+    @router.pre_checkout_query()
+    async def pre_checkout_query(
+        pre_checkout_q: PreCheckoutQuery, bot: Bot
+    ) -> None:
         await bot.answer_pre_checkout_query(pre_checkout_q.id, ok=True)
 
-    @dp.message_handler(content_types=types.ContentType.SUCCESSFUL_PAYMENT)
-    async def successful_payment(message: types.Message):
+    @router.message(F.successful_payment)
+    async def successful_payment(message: Message, bot: Bot) -> None:
         await message.answer("✅ Оплата успешно завершена! Спасибо за покупку.")
         await mark_user_premium(message.from_user.id)
         payment = message.successful_payment
@@ -51,4 +57,6 @@ def setup_payment_handlers(dp: Dispatcher, bot: Bot) -> None:
             payment.currency,
             payment.telegram_payment_charge_id,
         )
+
+    return router
 
